@@ -4,28 +4,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+import joblib  # NEW: Import joblib to load our model
+import numpy as np # NEW: Import numpy to shape our data for the model
 
 # --- Load Environment Variables ---
-# This line loads the OPENWEATHERMAP_API_KEY from your .env file
 load_dotenv()
 OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")
 
-# --- Pydantic Models (Data Validation) ---
+# --- NEW: Load the AI Model on Startup ---
+try:
+    anomaly_model = joblib.load("anomaly_model.joblib")
+    print("--- Anomaly detection model loaded successfully. ---")
+except FileNotFoundError:
+    anomaly_model = None
+    print("--- WARNING: Anomaly detection model not found. Proceeding without it. ---")
+
+
+# --- Pydantic Models ---
 class SimulationInput(BaseModel):
-    surface_area: float = Field(
-        ..., 
-        gt=0, 
-        description="The facade surface area in square meters. Must be greater than 0."
-    )
-    location: str = Field(
-        ...,
-        min_length=2,
-        description="The city name for which to fetch weather data."
-    )
+    surface_area: float = Field(..., gt=0)
+    location: str = Field(..., min_length=2)
+
 
 # --- Core Application Logic ---
 def calculate_water_harvest(surface_area: float, relative_humidity: float) -> float:
-    # This function remains unchanged
     BASELINE_YIELD_PER_SQ_METER = 1.11
     BASELINE_HUMIDITY = 0.20
     if relative_humidity <= 0 or surface_area <= 0:
@@ -35,70 +37,66 @@ def calculate_water_harvest(surface_area: float, relative_humidity: float) -> fl
     return round(estimated_yield, 2)
 
 async def get_weather_data(city: str) -> dict:
-    """Fetches weather data from OpenWeatherMap API."""
     if not OPENWEATHERMAP_API_KEY:
         raise HTTPException(status_code=500, detail="OpenWeatherMap API key is not configured.")
-        
     api_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHERMAP_API_KEY}&units=metric"
-    
     async with httpx.AsyncClient() as client:
         response = await client.get(api_url)
-
     if response.status_code == 401:
         raise HTTPException(status_code=401, detail="Invalid OpenWeatherMap API key.")
     if response.status_code == 404:
         raise HTTPException(status_code=404, detail=f"City '{city}' not found.")
     if response.status_code != 200:
         raise HTTPException(status_code=response.status_code, detail="Error fetching weather data.")
-        
     data = response.json()
-    # The humidity is given as a percentage, so we divide by 100
     humidity = data["main"]["humidity"] / 100
     temperature = data["main"]["temp"]
-    
     return {"relative_humidity": humidity, "temperature_celsius": temperature}
+
+# NEW: Function to use our loaded AI model
+def is_anomalous(humidity: float, yield_value: float) -> bool:
+    if anomaly_model is None:
+        return False
+    data_point = np.array([[humidity, yield_value]])
+    prediction = anomaly_model.predict(data_point)
+    return prediction[0] == -1
+
 
 # --- FastAPI Application ---
 app = FastAPI()
+
+# This is your existing, correct CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allows all origins
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"], # Allows all methods
-    allow_headers=["*"], # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.post("/simulate")
 async def run_simulation(input_data: SimulationInput):
-    """
-    Runs the simulation by fetching real-world weather data for a given location.
-    """
-    # 1. Fetch live weather data
     weather_data = await get_weather_data(input_data.location)
     
-    # 2. Run the simulation with the fetched humidity
     estimated_yield = calculate_water_harvest(
         surface_area=input_data.surface_area,
         relative_humidity=weather_data["relative_humidity"]
     )
 
-    # 3. Generate a simple mock 7-day forecast
-    # For the MVP, we'll simulate slight variations around today's yield.
-    forecast_data = [
-        round(estimated_yield * 1.05, 2), # Day 2
-        round(estimated_yield * 0.98, 2), # Day 3
-        round(estimated_yield * 1.10, 2), # Day 4
-        round(estimated_yield * 0.95, 2), # Day 5
-        round(estimated_yield * 1.02, 2), # Day 6
-        round(estimated_yield * 1.08, 2), # Day 7
-    ]
-    # Add today's yield as the first day
-    forecast_data.insert(0, estimated_yield)
+    # NEW: Use the AI model to check for anomalies
+    is_anomaly = is_anomalous(
+        humidity=weather_data["relative_humidity"],
+        yield_value=estimated_yield
+    )
 
-    # 4. Return a comprehensive result including the forecast
+    # We are still using real weather data to generate the first day's yield.
+    # The forecast for the next 6 days is a simple mock based on the first day.
+    forecast_data = [round(estimated_yield * v, 2) for v in [1.0, 1.05, 0.98, 1.10, 0.95, 1.02, 1.08]]
+
     return {
         "input_parameters": input_data,
         "live_weather_data": weather_data,
         "estimated_yield_liters_per_day": estimated_yield,
-        "forecast_7_day": forecast_data # NEW: Add the forecast data to the response
+        "forecast_7_day": forecast_data,
+        "anomaly_flag": is_anomaly # NEW: Add the flag to our response
     }
