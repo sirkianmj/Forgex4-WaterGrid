@@ -44,21 +44,13 @@ async def get_weather_data(city: str) -> dict:
     return {"relative_humidity": humidity, "temperature_celsius": temperature}
 
 # --- Z-Score Anomaly Detection (Corrected) ---
-# CHANGED: We now accept the surface_area as an input
 def is_anomalous(yield_value: float, surface_area: float, threshold: float = 3.5) -> bool:
     if not model_stats or surface_area == 0: return False
-    
-    # CHANGED: We now calculate yield per square meter to standardize the value
     yield_per_sq_meter = yield_value / surface_area
-
-    # The rest of the logic now compares the standardized value
     mean = model_stats["mean_yield"]
     std_dev = model_stats["std_dev_yield"]
     if std_dev == 0: return False
-    
-    # This will now be a realistic Z-score
     z_score = abs((yield_per_sq_meter - mean) / std_dev)
-    
     return z_score > threshold
 
 
@@ -67,12 +59,11 @@ app = FastAPI()
 
 @app.post("/simulate")
 async def run_simulation(input_data: SimulationInput):
-    weather_.data = await get_weather_data(input_data.location)
-    estimated_yield = calculate_water_harvest(surface_area=input_data.surface_area, relative_humidity=weather_data["relative_humidity"])
+    # THIS IS THE LINE THAT HAS BEEN CORRECTED
+    weather_data = await get_weather_data(input_data.location)
     
-    # Call the updated anomaly function with the surface area
+    estimated_yield = calculate_water_harvest(surface_area=input_data.surface_area, relative_humidity=weather_data["relative_humidity"])
     is_anomaly = is_anomalous(yield_value=estimated_yield, surface_area=input_data.surface_area)
-
     forecast_data = [round(estimated_yield * v, 2) for v in [1.0, 1.05, 0.98, 1.10, 0.95, 1.02, 1.08]]
     
     return {
