@@ -14,25 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const surfaceArea = parseFloat(surfaceAreaInput.value);
         showLoadingState();
 
-       /* // --- TEMPORARY TEST BLOCK ---
-        // Since your API key is not active, we will use mock data to test the chart.
-        // Once your key is working, you can delete this block and uncomment the 'try...catch' block below.
-        
-        console.log("--- USING MOCK DATA FOR TESTING ---");
-        const mockSuccessData = {
-            "input_parameters": { "surface_area": surfaceArea, "location": location },
-            "live_weather_data": { "relative_humidity": 0.45, "temperature_celsius": 28.5 },
-            "estimated_yield_liters_per_day": 146.1,
-            "forecast_7_day": [146.1, 153.41, 143.18, 160.71, 138.8, 149.02, 157.79]
-        };
-        showSuccessState(mockSuccessData);
-        // --- END OF TEMPORARY TEST BLOCK ---
-        */
 
-
-
-        // --- REAL API CALL BLOCK ---
-        // This is the real code. It is commented out for now.
         try {
             const response = await fetch('/simulate', {
                 method: 'POST',
