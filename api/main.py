@@ -1,4 +1,19 @@
 from fastapi import FastAPI
+from pydantic import BaseModel, Field
+
+# Add this new class below your imports
+class SimulationInput(BaseModel):
+    surface_area: float = Field(
+        ..., 
+        gt=0, 
+        description="The facade surface area in square meters. Must be greater than 0."
+    )
+    relative_humidity: float = Field(
+        ..., 
+        ge=0, 
+        le=1, 
+        description="The relative humidity as a decimal (e.g., 0.6 for 60%). Must be between 0 and 1."
+    )
 
 # Create an instance of the FastAPI class
 app = FastAPI()
@@ -42,3 +57,26 @@ def calculate_water_harvest(surface_area: float, relative_humidity: float) -> fl
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
+@app.post("/simulate")
+def run_simulation(input_data: SimulationInput):
+    """
+    Runs the water harvesting simulation.
+
+    This endpoint accepts facade surface area and relative humidity,
+    calculates the projected daily water yield, and returns the result.
+    """
+    # FastAPI automatically validates the incoming data against the SimulationInput model.
+    # If the data is invalid, it will automatically return a 422 Unprocessable Entity error.
+
+    # Call our core logic function with the validated data.
+    estimated_yield = calculate_water_harvest(
+        surface_area=input_data.surface_area,
+        relative_humidity=input_data.relative_humidity
+    )
+
+    # Return the results in a clear JSON format.
+    return {
+        "input_parameters": input_data,
+        "estimated_yield_liters_per_day": estimated_yield
+    }
