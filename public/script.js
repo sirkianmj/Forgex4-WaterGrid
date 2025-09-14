@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    const API_BASE_URL = 'https://upgraded-rotary-phone-76746x4g9vv3pxvp-8000.app.github.dev'; 
+
 
     const simulationForm = document.getElementById('simulation-form');
     const locationInput = document.getElementById('location');
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- REAL API CALL BLOCK ---
         // This is the real code. It is commented out for now.
         try {
-            const response = await fetch(`${API_BASE_URL}/api/simulate`, {
+            const response = await fetch('/api/simulate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ surface_area: surfaceArea, location: location }),
