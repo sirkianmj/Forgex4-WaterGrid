@@ -6,7 +6,7 @@
       "use": "@vercel/python",
       "config": {
         "includeFiles": [
-          "anomaly_model.joblib"
+          "model_stats.json"
         ]
       }
     },
