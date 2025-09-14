@@ -1,7 +1,7 @@
-fastapi
-python-dotenv
-httpx
-joblib
-numpy
-scikit-learn
-uvicorn
+fastapi==0.116.1
+python-dotenv==1.1.1
+httpx==0.28.1
+joblib==1.5.2
+numpy==2.3.3
+scikit-learn==1.7.2
+uvicorn==0.35.0
