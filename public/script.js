@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- REAL API CALL BLOCK ---
         // This is the real code. It is commented out for now.
         try {
-            const response = await fetch('/api/simulate', {
+            const response = await fetch('/simulate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ surface_area: surfaceArea, location: location }),
