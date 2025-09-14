@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forgex WaterGrid - Simulation Dashboard</title>
+    
+    <!-- Bootstrap CSS for professional styling -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS File -->
+    <link rel="stylesheet" href="style.css?v=1.1">
+    
+</head>
+<body>
+
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                Forgex WaterGrid - MVP v1.0
+            </a>
+        </div>
+    </nav>
+
+    <main class="container mt-4">
+        <div class="row">
+            <!-- LEFT COLUMN: Simulation Controls -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Simulation Controls</h4>
+                    </div>
+                    <div class="card-body">
+                        <form id="simulation-form">
+                            <div class="mb-3">
+                                <label for="location" class="form-label">Location (City Name)</label>
+                                <input type="text" class="form-control" id="location" required placeholder="e.g., Phoenix">
+                            </div>
+                            <div class="mb-3">
+                                <label for="surface-area" class="form-label">Façade Surface Area (m²)</label>
+                                <input type="number" class="form-control" id="surface-area" required placeholder="e.g., 58.5">
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Run Simulation</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Simulation Results -->
+            <div class="col-lg-8">
+                <!-- Primary Result Display -->
+                <div class="card text-center">
+                    <div class="card-header">
+                        <h4>Simulation Result</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="result-display">
+                            <p class="text-muted">Enter simulation parameters and click "Run Simulation" to see the results.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chart Display -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h4>7-Day Yield Forecast</h4>
+                    </div>
+                    <div class="card-body">
+                        <div id="chart-display">
+                            <!-- Plotly.js chart will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Our custom JavaScript file (for later) -->
+    <script src="script.js"></script>
+</body>
+<footer class="footer mt-auto py-3">
+        <div class="container text-center">
+            <p class="mb-1">
+                &copy; 2025 Kian Mansouri Jamshidi. All Rights Reserved.
+            </p>
+            <p class="mb-1">
+                Forgex WaterGrid is an open-source project licensed under the <a href="https://github.com/sirkianmj/Forgex4-WaterGrid/main/LICENSE" target="_blank" rel="noopener noreferrer">AGPL v3 License</a>.
+            </p>
+            <p class="text-muted small">
+                This is a simulation tool for academic and demonstration purposes.
+            </p>
+        </div>
+    </footer>
+</html>

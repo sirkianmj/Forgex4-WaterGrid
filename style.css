@@ -1,0 +1,75 @@
+/* High-Contrast, Professional Dark Theme with Interactive Elements */
+
+body {
+    font-family: 'Exo 2', sans-serif;
+    background-color: #000000;
+    color: #ffffff;
+}
+
+.card {
+    background-color: #1a1a1a;
+    border: 1px solid #333333;
+    /* ADDED: Smooth transition for our new hover effects */
+    transition: transform 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+/* ADDED: Hover effect to lift the card and make its border glow white */
+.card:hover {
+    transform: translateY(-5px);
+    border-color: #ffffff;
+}
+
+.card-header {
+    background-color: #252525;
+    border-bottom: 1px solid #333333;
+    font-weight: bold;
+}
+
+.form-label {
+    color: #ffffff;
+}
+
+.form-control {
+    background-color: #101010;
+    border: 1px solid #444444;
+    color: #ffffff;
+}
+
+.form-control:focus {
+    background-color: #101010;
+    border-color: #ffffff;
+    box-shadow: none;
+    color: #ffffff;
+}
+
+.form-control::placeholder {
+    color: #777777;
+}
+
+.btn-primary {
+    background-color: #ffffff;
+    border-color: #ffffff;
+    color: #000000;
+    font-weight: bold;
+    /* ADDED: Smooth transition for the button's hover effect */
+    transition: all 0.2s ease-in-out;
+}
+
+/* ADDED: A more noticeable hover effect for the button */
+.btn-primary:hover {
+    background-color: #cccccc;
+    border-color: #cccccc;
+    transform: scale(1.02); /* Makes the button slightly larger */
+}
+
+.navbar.bg-dark {
+    background-color: #1a1a1a !important;
+}
+
+.navbar-brand {
+    color: #ffffff !important;
+}
+
+#result-display .text-muted {
+    color: #aaaaaa !important;
+}
