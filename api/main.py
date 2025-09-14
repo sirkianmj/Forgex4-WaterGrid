@@ -68,10 +68,6 @@ app.add_middleware(
     allow_headers=["*"], # Allows all headers
 )
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
-
 @app.post("/simulate")
 async def run_simulation(input_data: SimulationInput):
     """
@@ -86,9 +82,23 @@ async def run_simulation(input_data: SimulationInput):
         relative_humidity=weather_data["relative_humidity"]
     )
 
-    # 3. Return a comprehensive result
+    # 3. Generate a simple mock 7-day forecast
+    # For the MVP, we'll simulate slight variations around today's yield.
+    forecast_data = [
+        round(estimated_yield * 1.05, 2), # Day 2
+        round(estimated_yield * 0.98, 2), # Day 3
+        round(estimated_yield * 1.10, 2), # Day 4
+        round(estimated_yield * 0.95, 2), # Day 5
+        round(estimated_yield * 1.02, 2), # Day 6
+        round(estimated_yield * 1.08, 2), # Day 7
+    ]
+    # Add today's yield as the first day
+    forecast_data.insert(0, estimated_yield)
+
+    # 4. Return a comprehensive result including the forecast
     return {
         "input_parameters": input_data,
         "live_weather_data": weather_data,
-        "estimated_yield_liters_per_day": estimated_yield
+        "estimated_yield_liters_per_day": estimated_yield,
+        "forecast_7_day": forecast_data # NEW: Add the forecast data to the response
     }
