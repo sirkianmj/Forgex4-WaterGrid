@@ -3,12 +3,7 @@
   "builds": [
     {
       "src": "main.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": [
-          "model_stats.json"
-        ]
-      }
+      "use": "@vercel/python"
     },
     {
       "src": "public/**/*",
