@@ -10,7 +10,6 @@ load_dotenv()
 OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")
 
 # --- Hardcoded Statistical Model ---
-# This eliminates all file loading errors. The model is now part of the code.
 model_stats = {
     "mean_yield": 143.40654101675244,
     "std_dev_yield": 56.09032380666645
@@ -44,13 +43,22 @@ async def get_weather_data(city: str) -> dict:
     temperature = data["main"]["temp"]
     return {"relative_humidity": humidity, "temperature_celsius": temperature}
 
-# --- Z-Score Anomaly Detection (Unchanged) ---
-def is_anomalous(yield_value: float, threshold: float = 3.5) -> bool:
-    if not model_stats: return False
+# --- Z-Score Anomaly Detection (Corrected) ---
+# CHANGED: We now accept the surface_area as an input
+def is_anomalous(yield_value: float, surface_area: float, threshold: float = 3.5) -> bool:
+    if not model_stats or surface_area == 0: return False
+    
+    # CHANGED: We now calculate yield per square meter to standardize the value
+    yield_per_sq_meter = yield_value / surface_area
+
+    # The rest of the logic now compares the standardized value
     mean = model_stats["mean_yield"]
     std_dev = model_stats["std_dev_yield"]
     if std_dev == 0: return False
-    z_score = abs((yield_value - mean) / std_dev)
+    
+    # This will now be a realistic Z-score
+    z_score = abs((yield_per_sq_meter - mean) / std_dev)
+    
     return z_score > threshold
 
 
@@ -59,10 +67,14 @@ app = FastAPI()
 
 @app.post("/simulate")
 async def run_simulation(input_data: SimulationInput):
-    weather_data = await get_weather_data(input_data.location)
+    weather_.data = await get_weather_data(input_data.location)
     estimated_yield = calculate_water_harvest(surface_area=input_data.surface_area, relative_humidity=weather_data["relative_humidity"])
-    is_anomaly = is_anomalous(yield_value=estimated_yield)
+    
+    # Call the updated anomaly function with the surface area
+    is_anomaly = is_anomalous(yield_value=estimated_yield, surface_area=input_data.surface_area)
+
     forecast_data = [round(estimated_yield * v, 2) for v in [1.0, 1.05, 0.98, 1.10, 0.95, 1.02, 1.08]]
+    
     return {
         "input_parameters": input_data,
         "live_weather_data": weather_data,
