@@ -73,3 +73,16 @@ body {
 #result-display .text-muted {
     color: #aaaaaa !important;
 }
+#result-display h3 {
+    color: #ffffff; /* Make the main number bright white */
+    font-size: 3.5rem; /* Make the number larger */
+    font-weight: bold;
+}
+
+#result-display .lead {
+    color: #f0f0f0; /* A bright, readable white for the description */
+}
+
+#result-display .text-muted {
+    color: #aaaaaa !important; /* A lighter grey for the weather data, !important overrides other styles */
+}

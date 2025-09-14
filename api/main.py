@@ -1,82 +1,94 @@
-from fastapi import FastAPI
+import os
+import httpx
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
 
-# Add this new class below your imports
+# --- Load Environment Variables ---
+# This line loads the OPENWEATHERMAP_API_KEY from your .env file
+load_dotenv()
+OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")
+
+# --- Pydantic Models (Data Validation) ---
 class SimulationInput(BaseModel):
     surface_area: float = Field(
         ..., 
         gt=0, 
         description="The facade surface area in square meters. Must be greater than 0."
     )
-    relative_humidity: float = Field(
-        ..., 
-        ge=0, 
-        le=1, 
-        description="The relative humidity as a decimal (e.g., 0.6 for 60%). Must be between 0 and 1."
+    location: str = Field(
+        ...,
+        min_length=2,
+        description="The city name for which to fetch weather data."
     )
 
-# Create an instance of the FastAPI class
-app = FastAPI()
-
-
-
+# --- Core Application Logic ---
 def calculate_water_harvest(surface_area: float, relative_humidity: float) -> float:
-    """
-    Calculates the estimated daily water yield based on a simplified model
-    derived from the PEG-SiO2 Nanocomposite technical paper.
-
-    Args:
-        surface_area (float): The facade surface area in square meters.
-        relative_humidity (float): The current relative humidity as a decimal (e.g., 0.60 for 60%).
-
-    Returns:
-        float: The estimated water yield in Liters per day.
-    """
-    # --- Constants based on the scientific paper's data ---
-    # Yield (L/m^2/day) at the baseline humidity level.
+    # This function remains unchanged
     BASELINE_YIELD_PER_SQ_METER = 1.11
-    # The baseline humidity condition (20%).
     BASELINE_HUMIDITY = 0.20
-
-    # Basic validation: no water can be harvested with no area or humidity.
     if relative_humidity <= 0 or surface_area <= 0:
         return 0.0
-
-    # Simplified linear scaling model for the MVP:
-    # We assume the yield scales directly with humidity relative to the baseline.
-    # For example, at 40% humidity (0.40), the yield per square meter should be double the baseline.
     humidity_factor = relative_humidity / BASELINE_HUMIDITY
-    
     estimated_yield = surface_area * BASELINE_YIELD_PER_SQ_METER * humidity_factor
-
-    # Return the result rounded to two decimal places for cleanliness.
     return round(estimated_yield, 2)
 
+async def get_weather_data(city: str) -> dict:
+    """Fetches weather data from OpenWeatherMap API."""
+    if not OPENWEATHERMAP_API_KEY:
+        raise HTTPException(status_code=500, detail="OpenWeatherMap API key is not configured.")
+        
+    api_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHERMAP_API_KEY}&units=metric"
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(api_url)
 
-# Define a "route" or "endpoint"
+    if response.status_code == 401:
+        raise HTTPException(status_code=401, detail="Invalid OpenWeatherMap API key.")
+    if response.status_code == 404:
+        raise HTTPException(status_code=404, detail=f"City '{city}' not found.")
+    if response.status_code != 200:
+        raise HTTPException(status_code=response.status_code, detail="Error fetching weather data.")
+        
+    data = response.json()
+    # The humidity is given as a percentage, so we divide by 100
+    humidity = data["main"]["humidity"] / 100
+    temperature = data["main"]["temp"]
+    
+    return {"relative_humidity": humidity, "temperature_celsius": temperature}
+
+# --- FastAPI Application ---
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"], # Allows all methods
+    allow_headers=["*"], # Allows all headers
+)
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
 @app.post("/simulate")
-def run_simulation(input_data: SimulationInput):
+async def run_simulation(input_data: SimulationInput):
     """
-    Runs the water harvesting simulation.
-
-    This endpoint accepts facade surface area and relative humidity,
-    calculates the projected daily water yield, and returns the result.
+    Runs the simulation by fetching real-world weather data for a given location.
     """
-    # FastAPI automatically validates the incoming data against the SimulationInput model.
-    # If the data is invalid, it will automatically return a 422 Unprocessable Entity error.
-
-    # Call our core logic function with the validated data.
+    # 1. Fetch live weather data
+    weather_data = await get_weather_data(input_data.location)
+    
+    # 2. Run the simulation with the fetched humidity
     estimated_yield = calculate_water_harvest(
         surface_area=input_data.surface_area,
-        relative_humidity=input_data.relative_humidity
+        relative_humidity=weather_data["relative_humidity"]
     )
 
-    # Return the results in a clear JSON format.
+    # 3. Return a comprehensive result
     return {
         "input_parameters": input_data,
+        "live_weather_data": weather_data,
         "estimated_yield_liters_per_day": estimated_yield
     }
