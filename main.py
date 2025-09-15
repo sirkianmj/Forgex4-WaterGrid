@@ -8,21 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
 OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY")
 
-# --- YOUR EXCELLENT ADDITION: Fail-fast if the key is missing ---
-if not OPENWEATHERMAP_API_KEY:
-    raise RuntimeError("FATAL: OPENWEATHERMAP_API_KEY environment variable not set.")
-
-# --- Hardcoded Statistical Model ---
-MODEL_STATS = {
-    "mean_yield": 143.40654101675244,
-    "std_dev_yield": 56.09032380666645
-}
-
 # --- Pydantic Models (Unchanged) ---
 class SimulationInput(BaseModel):
     surface_area: float = Field(..., gt=0)
     location: str = Field(..., min_length=2)
-
 
 # --- Core Logic (Unchanged) ---
 def calculate_water_harvest(surface_area: float, relative_humidity: float) -> float:
@@ -33,41 +22,58 @@ def calculate_water_harvest(surface_area: float, relative_humidity: float) -> fl
     estimated_yield = surface_area * BASELINE_YIELD_PER_SQ_METER * humidity_factor
     return round(estimated_yield, 2)
 
-# --- YOUR EXCELLENT ADDITION: More robust error handling ---
 async def get_weather_data(city: str) -> dict:
+    if not OPENWEATHERMAP_API_KEY: raise HTTPException(status_code=500, detail="OpenWeatherMap API key is not configured.")
     api_url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHERMAP_API_KEY}&units=metric"
     async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(api_url)
-            response.raise_for_status()
-            data = response.json()
-            humidity = data["main"]["humidity"] / 100
-            temperature = data["main"]["temp"]
-            return {"relative_humidity": humidity, "temperature_celsius": temperature}
-        except httpx.HTTPStatusError as e:
-            raise HTTPException(status_code=e.response.status_code, detail=f"Error fetching weather data for '{city}'.")
-        except (KeyError, TypeError):
-            raise HTTPException(status_code=500, detail="Could not parse weather data from API response.")
+        response = await client.get(api_url)
+    if response.status_code != 200: raise HTTPException(status_code=response.status_code, detail=f"Error fetching weather data for '{city}'.")
+    data = response.json()
+    humidity = data["main"]["humidity"] / 100
+    temperature = data["main"]["temp"]
+    return {"relative_humidity": humidity, "temperature_celsius": temperature}
 
-# --- THE FINAL, CORRECTED LOGIC: Rule-based Anomaly Detection ---
-def is_anomalous(yield_value: float, surface_area: float) -> bool:
-    """Checks if the result is physically improbable."""
-    if surface_area == 0: return False
+# --- NEW: Final, Correct, Rule-Based Anomaly Detection ---
+def get_anomaly_info(yield_value: float, surface_area: float) -> dict:
+    """
+    Checks if the result is anomalous based on two simple, robust rules.
+    Returns a dictionary with the flag and debug information.
+    """
+    # Rule 1: Check if the input surface area is nonsensical.
+    # 10,000,000 m^2 is 10 square kilometers, a generous upper limit for a single building facade.
+    MAX_SANE_SURFACE_AREA = 10_000_000.0
     
-    # Define a generous "world record" physical limit for this technology
+    is_area_anomaly = surface_area > MAX_SANE_SURFACE_AREA
+    
+    # Rule 2: Check if the yield per square meter is physically impossible.
+    # This catches data corruption errors (e.g., humidity > 100%).
+    yield_per_sq_meter = 0
+    if surface_area > 0:
+        yield_per_sq_meter = yield_value / surface_area
+        
     MAX_PHYSICALLY_POSSIBLE_YIELD_PER_SQ_METER = 10.0
+    is_yield_anomaly = yield_per_sq_meter > MAX_PHYSICALLY_POSSIBLE_YIELD_PER_SQ_METER
+
+    # The final flag is true if EITHER rule is broken.
+    final_flag = is_area_anomaly or is_yield_anomaly
+
+    # This debug info will be sent to the frontend!
+    debug_info = {
+        "reasoning": "Anomaly is true if either the input area is too large or the yield per m^2 is physically impossible.",
+        "input_surface_area": surface_area,
+        "max_sane_surface_area": MAX_SANE_SURFACE_AREA,
+        "is_area_anomaly": is_area_anomaly,
+        "yield_per_sq_meter": round(yield_per_sq_meter, 2),
+        "max_yield_per_sq_meter": MAX_PHYSICALLY_POSSIBLE_YIELD_PER_SQ_METER,
+        "is_yield_anomaly": is_yield_anomaly,
+        "final_decision": final_flag
+    }
     
-    yield_per_sq_meter = yield_value / surface_area
-    
-    # If the calculated yield per square meter exceeds our defined physical limit, it is an anomaly.
-    return yield_per_sq_meter > MAX_PHYSICALLY_POSSIBLE_YIELD_PER_SQ_METER
+    return {"is_anomaly": final_flag, "debug_info": debug_info}
 
 
 # --- FastAPI Application ---
-app = FastAPI(
-    title="Water Harvest Simulation API",
-    description="An API to simulate water yield based on location and surface area."
-)
+app = FastAPI()
 
 @app.post("/simulate")
 async def run_simulation(input_data: SimulationInput):
@@ -77,19 +83,19 @@ async def run_simulation(input_data: SimulationInput):
         relative_humidity=weather_data["relative_humidity"]
     )
     
-    # Call the corrected, rule-based anomaly function
-    is_anomaly = is_anomalous(
-        yield_value=estimated_yield, 
+    # Call the new, correct anomaly function
+    anomaly_result = get_anomaly_info(
+        yield_value=estimated_yield,
         surface_area=input_data.surface_area
     )
 
-    forecast_multipliers = [1.0, 1.05, 0.98, 1.10, 0.95, 1.02, 1.08]
-    forecast_data = [round(estimated_yield * v, 2) for v in forecast_multipliers]
+    forecast_data = [round(estimated_yield * v, 2) for v in [1.0, 1.05, 0.98, 1.10, 0.95, 1.02, 1.08]]
     
     return {
         "input_parameters": input_data,
         "live_weather_data": weather_data,
         "estimated_yield_liters_per_day": estimated_yield,
         "forecast_7_day": forecast_data,
-        "anomaly_flag": is_anomaly
+        "anomaly_flag": anomaly_result["is_anomaly"],
+        "debug_info": anomaly_result["debug_info"] # We now return the debug info!
     }
