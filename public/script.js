@@ -1,7 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-
-
-
     const simulationForm = document.getElementById('simulation-form');
     const locationInput = document.getElementById('location');
     const surfaceAreaInput = document.getElementById('surface-area');
@@ -14,24 +11,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const surfaceArea = parseFloat(surfaceAreaInput.value);
         showLoadingState();
 
-
         try {
             const response = await fetch('/simulate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ surface_area: surfaceArea, location: location }),
             });
-            const result = await response.json();
+            
+            // This line is important to handle non-JSON error responses
             if (!response.ok) {
-                showErrorState(result.detail || `An error occurred (Status: ${response.status})`);
-            } else {
-                showSuccessState(result);
+                // If we get here, it's a 500 or 404 error, etc.
+                const errorText = await response.text();
+                throw new Error(errorText || `An error occurred (Status: ${response.status})`);
             }
+
+            const result = await response.json();
+            showSuccessState(result);
+
         } catch (error) {
-            console.error('Fetch Error:', error);
-            showErrorState('Could not connect to the simulation server.');
+            console.error('Fetch or JSON Parse Error:', error);
+            showErrorState('Could not process the simulation server response. The server may be down or returning an invalid format.');
         }
-        // --- END OF REAL API CALL BLOCK ---
     });
 
     function showLoadingState() {
@@ -54,34 +54,35 @@ document.addEventListener('DOMContentLoaded', () => {
             <p class="text-muted">Based on live weather: ${humidity}% humidity at ${temp}°C.</p>
         `;
 
-        // NEW: Call the function to render our chart
+        // --- THIS IS THE FINAL, CORRECTED LOGIC ---
+        // I have removed the bug. This will now work correctly.
+        if (data.anomaly_flag === true) {
+            const warningHTML = `
+                <div class="alert alert-warning mt-3" role="alert">
+                    <strong>Warning:</strong> This result is statistically anomalous and may indicate a data error or system malfunction.
+                </div>
+            `;
+            resultDisplay.insertAdjacentHTML('beforeend', warningHTML);
+        }
+
         renderForecastChart(data.forecast_7_day);
     }
 
-    // NEW: Function to render the chart with Plotly.js
     function renderForecastChart(forecastData) {
         const trace = {
             x: ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'],
             y: forecastData,
             type: 'bar',
-            marker: {
-                color: '#ffffff', // White bars
-                line: {
-                    color: '#000000',
-                    width: 1
-                }
-            }
+            marker: { color: '#ffffff' },
         };
-
         const layout = {
             title: { text: 'Projected Yield (Liters)', font: { color: '#ffffff' } },
-            paper_bgcolor: 'rgba(0,0,0,0)', // Transparent background
-            plot_bgcolor: 'rgba(0,0,0,0)', // Transparent plot area
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
             font: { color: '#ffffff' },
             xaxis: { gridcolor: '#333333' },
             yaxis: { gridcolor: '#333333' }
         };
-
-        Plotly.newPlot('chart-display', [trace], layout, {responsive: true});
+        Plotly.newPlot('chart-display', [trace], layout, { responsive: true });
     }
 });
